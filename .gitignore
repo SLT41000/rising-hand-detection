@@ -1,0 +1,8 @@
+/lib/*
+/path/*
+/runs/*
+/Scripts/*
+/share/*
+/__pycache__/*
+/include/*
+/.vscode/*
