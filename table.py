@@ -6,7 +6,7 @@ import numpy as np
 model_pose = YOLO('yolov8n-pose.pt')  # for detect pose
 model_detect = YOLO('yolov8n.pt')  # for detect table
 model_detect.predict( save=True, classes=[60])
-cap = cv2.VideoCapture(1)
+cap = cv2.VideoCapture(0)
 left_wrist_idx = 9
 right_wrist_idx = 10
 result_object=None
