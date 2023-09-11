@@ -7,7 +7,7 @@ import cofig
 class temi_hand_dectecter:
     
     
-    def __init__(self,  cam=0, hand_raise_threshold=0.3,ip="",port="",connection=True):
+    def __init__(self,  cam=0, hand_raise_threshold=0,ip="",port="",connection=True):
         self.cam = cam
         self.hand_raise_threshold= hand_raise_threshold
         self.model_pose = YOLO('yolov8n-pose.pt')  # for detect pose
@@ -80,10 +80,10 @@ class temi_hand_dectecter:
                     right_shoulder_y = right_shoulder[1]
 
                     # Define a threshold for hand raise in relation to the shoulder
-                    hand_shoulder_threshold = 0 # You can adjust this threshold as needed
+                    self.hand_shoulder_threshold = 0 # You can adjust this threshold as needed
                     
                     # Check if both wrists are above their respective shoulders
-                    if (left_wrist_y+hand_shoulder_threshold < left_shoulder_y or right_wrist_y+hand_shoulder_threshold < right_shoulder_y) and  (left_shoulder_y <= 0.9 or right_shoulder_y  <=0.9):
+                    if (left_wrist_y+self.hand_shoulder_threshold < left_shoulder_y or right_wrist_y+self.hand_shoulder_threshold < right_shoulder_y) and  (left_shoulder_y <= 0.9 or right_shoulder_y  <=0.9):
                         # Draw bounding box and annotate the frame with the hand raise message
                         print(True)
                         xmin, ymin, xmax, ymax = box
