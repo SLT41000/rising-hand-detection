@@ -2,7 +2,7 @@ import cv2
 
 USER = "admin"
 PASS = "888888"
-IP = "ipv4"
+IP = "192.168.1.116"
 PORT = "10554"
 STREAM_PATH = "av0_0"
 

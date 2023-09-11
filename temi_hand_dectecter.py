@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 import client_cam
 import math
+import cofig
 class temi_hand_dectecter:
     
     
@@ -11,7 +12,6 @@ class temi_hand_dectecter:
         self.hand_raise_threshold= hand_raise_threshold
         self.model_pose = YOLO('yolov8n-pose.pt')  # for detect pose
         self.cap = cv2.VideoCapture(self.cam)
-        
         self.left_wrist_idx = 9
         self.right_wrist_idx = 10
         self.result_object=None
@@ -46,7 +46,7 @@ class temi_hand_dectecter:
                 self.drawing = False
     
     def start(self):
-        
+        client_cam.connection=self.connection
         client_cam.connect(self.ip,self.port)
         client_cam.temi_stat="IDLE"
         self.cap.set(cv2.CAP_PROP_FPS, 30)
@@ -70,11 +70,22 @@ class temi_hand_dectecter:
                     left_wrist = result_keypoints[i][self.left_wrist_idx][:2]
                     right_wrist = result_keypoints[i][self.right_wrist_idx][:2]
                     # Define a threshold for hand raising
+                    left_shoulder = result_keypoints[i][5][:2]
+                    right_shoulder = result_keypoints[i][6][:2]
+
+                    # Calculate the Y-coordinates of wrists and shoulders
+                    left_wrist_y = left_wrist[1]
+                    right_wrist_y = right_wrist[1]
+                    left_shoulder_y = left_shoulder[1]
+                    right_shoulder_y = right_shoulder[1]
+
+                    # Define a threshold for hand raise in relation to the shoulder
+                    hand_shoulder_threshold = 0 # You can adjust this threshold as needed
                     
-                    
-                    # Check if the y-coordinate of either wrist is above the threshold
-                    if left_wrist[1] < self.hand_raise_threshold or right_wrist[1] < self.hand_raise_threshold:
+                    # Check if both wrists are above their respective shoulders
+                    if (left_wrist_y+hand_shoulder_threshold < left_shoulder_y or right_wrist_y+hand_shoulder_threshold < right_shoulder_y) and  (left_shoulder_y <= 0.9 or right_shoulder_y  <=0.9):
                         # Draw bounding box and annotate the frame with the hand raise message
+                        print(True)
                         xmin, ymin, xmax, ymax = box
                         person_center = ((xmin + xmax) / 2, (ymin + ymax) / 2)
                         cv2.rectangle(annotated_frame, (int(xmin), int(ymin)), (int(xmax), int(ymax)), (0, 255, 0), 2)
@@ -106,9 +117,9 @@ class temi_hand_dectecter:
                                 min_distance = distance_to_dot
                                 nearest_dot = dot_name
                                 
-                            if nearest_dot not in self.table_queue:
-                                self.table_queue.append(nearest_dot)
-                                print(nearest_dot)
+                        if (nearest_dot not in self.table_queue) and nearest_dot != None:
+                            self.table_queue.append(nearest_dot)
+                            print(nearest_dot)
 
                 
                 for dot_x, dot_y, square_size, dot_name in self.dot_locations:
@@ -144,5 +155,5 @@ class temi_hand_dectecter:
         cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    test = temi_hand_dectecter(ip="ipv4",port="5000")
+    test = temi_hand_dectecter(ip=cofig.SERVER_SOCKET_IPV4,port=cofig.SERVER_SOCKET_PORT,cam=0,connection=False)
     test.start()

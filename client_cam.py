@@ -3,14 +3,21 @@ import eventlet
 sio = socketio.Client()
 
 temi_stat = "IDLE"
+connection= True
+
 def connect(ip,port):
-    
+    if(connection==False):
+        return "connection set false"
     sio.connect('http://'+ip+':'+port+'')
 
-def disconnect():    
+def disconnect():   
+    if(connection==False):
+        return "connection set false"
     sio.disconnect()
 
 def sentlocation(location):
+    if(connection==False):
+        return "connection set false"
     global temi_stat
     location=int(location)
     temi_stat="BUSY"
