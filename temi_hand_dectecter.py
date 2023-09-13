@@ -4,28 +4,26 @@ import numpy as np
 import client_cam
 import math
 import cofig
+from client_cam import client_cam
+import time
 class temi_hand_dectecter:
     
     
     def __init__(self,  cam=0, hand_raise_threshold=0,ip="",port="",connection=True):
-        self.cam = cam
         self.hand_raise_threshold= hand_raise_threshold
         self.model_pose = YOLO('yolov8n-pose.pt')  # for detect pose
-        self.cap = cv2.VideoCapture(self.cam)
-        self.left_wrist_idx = 9
-        self.right_wrist_idx = 10
-        self.result_object=None
+        self.cap = cv2.VideoCapture(cam)
         self.table_centers = []
         self.table_queue=[]
-        self.ip=ip
-        self.port=port
-        self.connection=connection
-        self.dot_locations = []  # Initialize an empty list for dot locations
-        
-    
+        self.connection=client_cam(ip=ip,port=port,connection=connection)
+        self.dot_locations = []  
+        self.pre_locations=[]
         self.drawing = False
         self.start_x, self.start_y = -1, -1
         self.end_x, self.end_y = -1, -1
+        self.pre_locations=None
+        self.last_append=0
+        
 
     def on_mouse_click(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
@@ -46,9 +44,7 @@ class temi_hand_dectecter:
                 self.drawing = False
     
     def start(self):
-        client_cam.connection=self.connection
-        client_cam.connect(self.ip,self.port)
-        client_cam.temi_stat="IDLE"
+        
         self.cap.set(cv2.CAP_PROP_FPS, 30)
 
         while self.cap.isOpened():
@@ -56,7 +52,7 @@ class temi_hand_dectecter:
             cv2.namedWindow("YOLOv8")
             cv2.setMouseCallback("YOLOv8", self.on_mouse_click)
             if success:
-                
+                current_time = time.time()
                 result_pose = self.model_pose(frame)
                 
             
@@ -67,8 +63,8 @@ class temi_hand_dectecter:
                 for i, box in enumerate(result_pose[0].boxes.xyxy): #check pose person who raising hand
                     
                     # Extract keypoint coordinates for wrists
-                    left_wrist = result_keypoints[i][self.left_wrist_idx][:2]
-                    right_wrist = result_keypoints[i][self.right_wrist_idx][:2]
+                    left_wrist = result_keypoints[i][9][:2]
+                    right_wrist = result_keypoints[i][10][:2]
                     # Define a threshold for hand raising
                     left_shoulder = result_keypoints[i][5][:2]
                     right_shoulder = result_keypoints[i][6][:2]
@@ -85,7 +81,7 @@ class temi_hand_dectecter:
                     # Check if both wrists are above their respective shoulders
                     if (left_wrist_y+self.hand_shoulder_threshold < left_shoulder_y or right_wrist_y+self.hand_shoulder_threshold < right_shoulder_y) and  (left_shoulder_y <= 0.9 or right_shoulder_y  <=0.9):
                         # Draw bounding box and annotate the frame with the hand raise message
-                        print(True)
+                        
                         xmin, ymin, xmax, ymax = box
                         person_center = ((xmin + xmax) / 2, (ymin + ymax) / 2)
                         cv2.rectangle(annotated_frame, (int(xmin), int(ymin)), (int(xmax), int(ymax)), (0, 255, 0), 2)
@@ -117,9 +113,10 @@ class temi_hand_dectecter:
                                 min_distance = distance_to_dot
                                 nearest_dot = dot_name
                                 
-                        if (nearest_dot not in self.table_queue) and nearest_dot != None:
+                        if nearest_dot is not None and nearest_dot not in self.table_queue and (nearest_dot != self.pre_locations or current_time - self.last_append>= 5):
                             self.table_queue.append(nearest_dot)
-                            print(nearest_dot)
+                            self.last_append = current_time
+                            
 
                 
                 for dot_x, dot_y, square_size, dot_name in self.dot_locations:
@@ -135,10 +132,13 @@ class temi_hand_dectecter:
                         cv2.LINE_AA,
                     )
                 print(self.table_queue)  
-                print(client_cam.temi_stat)     
+                print(self.connection.status)     
                 print(self.dot_locations)
-                if(client_cam.temi_stat=='IDLE' and len(self.table_queue)!=0 ):
-                    client_cam.sentlocation(self.table_queue.pop(0))
+                if(self.connection.status=='IDLE' and len(self.table_queue)!=0):
+                    
+                    self.pre_locations=self.table_queue.pop(0)
+                    self.connection.sentlocation(self.pre_locations)
+                    
 
                         
 
@@ -146,7 +146,7 @@ class temi_hand_dectecter:
                 cv2.imshow("YOLOv8", annotated_frame)
                 
                 if cv2.waitKey(1) & 0xFF == ord("q"):
-                    client_cam.disconnect()
+                    self.connection.disconnect()
                     break
             else:
                 break
@@ -155,5 +155,5 @@ class temi_hand_dectecter:
         cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    test = temi_hand_dectecter(ip=cofig.SERVER_SOCKET_IPV4,port=cofig.SERVER_SOCKET_PORT,cam=0,connection=False)
+    test = temi_hand_dectecter(ip=cofig.SERVER_SOCKET_IPV4,port=cofig.SERVER_SOCKET_PORT,cam=0)
     test.start()
