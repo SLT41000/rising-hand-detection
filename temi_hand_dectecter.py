@@ -1,12 +1,10 @@
 from ultralytics import YOLO
 import cv2
 import numpy as np
-import client_cam
-import math
 import config
 from server_cam import CustomSocketIOServer
 import time
-import threading
+
 class temi_hand_dectecter:
     
     
