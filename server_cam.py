@@ -1,7 +1,7 @@
 import eventlet
 import socketio
 import threading
-import cofig
+import config
 class CustomSocketIOServer:
     def __init__(self,ip,port):
         self.sio = socketio.Server()
@@ -64,4 +64,4 @@ class CustomSocketIOServer:
 
 if __name__ == '__main__':
     custom_server = CustomSocketIOServer()
-    custom_server.start_server(cofig.SERVER_SOCKET_IPV4, 5000)
+    custom_server.start_server(config.SERVER_SOCKET_IPV4, 5000)

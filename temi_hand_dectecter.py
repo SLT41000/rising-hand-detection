@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import client_cam
 import math
-import cofig
+import config
 from server_cam import CustomSocketIOServer
 import time
 import threading
@@ -149,5 +149,5 @@ class temi_hand_dectecter:
         cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    test = temi_hand_dectecter(ip=cofig.SERVER_SOCKET_IPV4,port=cofig.SERVER_SOCKET_PORT,cam=0)
+    test = temi_hand_dectecter(ip=config.SERVER_SOCKET_IPV4,port=config.SERVER_SOCKET_PORT,cam=0)
     test.start()
