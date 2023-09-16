@@ -5,6 +5,7 @@ import config
 from server_cam import CustomSocketIOServer
 import time
 
+
 class temi_hand_dectecter:
     
     
@@ -44,9 +45,17 @@ class temi_hand_dectecter:
     
     
     def label_person(self,result_pose,annotated_frame):
+        #การใช้ pose_est ในการการคำนวนจาก keypoint มีข้อเสียที่คิดไว้คือ มันต้องใช้มุมที่เห็นคนตรงสรีระเท่านั้นเพื่อไม้ให้ค่า keypoint ที่คำนวนผิดพลาด
+        #แล้วใช้มุมแบบ top view ไม่ได้ เพราะค่า xy ที่ได้จะจากข้อมือกับค่าที่ได้จากไหล่จะบอกไม่ได้ว่ามืออยู่สูงกว่าไหล่รึป่าว
+        if(result_pose[0].keypoints.conf==None):
+            return
+        conf=result_pose[0].keypoints.conf.cpu().numpy()
+        result_keypoints = result_pose[0].keypoints.xyn.cpu().numpy()
+        print(conf[0][9:11])
         current_time = time.time()
         for i, box in enumerate(result_pose[0].boxes.xyxy): #check pose person who raising hand
-            result_keypoints = result_pose[0].keypoints.xyn.cpu().numpy()
+            if np.any(conf[i][9:11]<0.25) or np.any(conf[i][5:7]<0.25):
+                continue
             # Extract keypoint coordinates for wrists
             left_wrist = result_keypoints[i][9][:2]
             right_wrist = result_keypoints[i][10][:2]
@@ -59,7 +68,8 @@ class temi_hand_dectecter:
             right_wrist_y = right_wrist[1]
             left_shoulder_y = left_shoulder[1]
             right_shoulder_y = right_shoulder[1]
-
+            
+            
             # Define a threshold for hand raise in relation to the shoulder
             self.hand_shoulder_threshold = 0 # You can adjust this threshold as needed
             
@@ -138,13 +148,13 @@ class temi_hand_dectecter:
                 cv2.imshow("YOLOv8", annotated_frame)
                 
                 if cv2.waitKey(1) & 0xFF == ord("q"):
-                    
+                    self.cap.release()
+                    cv2.destroyAllWindows()
+                    self.connection.stop_server()
                     break
             else:
                 break
 
-        self.cap.release()
-        cv2.destroyAllWindows()
 
 if __name__ == '__main__':
     test = temi_hand_dectecter(ip=config.SERVER_SOCKET_IPV4,port=config.SERVER_SOCKET_PORT,cam=0)

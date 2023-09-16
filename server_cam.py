@@ -2,6 +2,8 @@ import eventlet
 import socketio
 import threading
 import config
+
+import sys
 class CustomSocketIOServer:
     def __init__(self,ip,port):
         self.sio = socketio.Server()
@@ -13,13 +15,17 @@ class CustomSocketIOServer:
         self.status = "IDLE"
         self.setup_events()
         self.server=threading.Thread(target=self.start_server, args=(ip, port))
+        self.server.start()
+        
+        
         
         
 
     def setup_events(self):
         @self.sio.event
         def move_to(sid):
-           
+            if(self.cur_location==None):
+               return
             self.sio.emit("receiver_goto_dest", self.cur_location)
 
         @self.sio.event
@@ -50,18 +56,29 @@ class CustomSocketIOServer:
         def receiver_location(sid, data):
             self.location = data
             
+    def stop_server(self):
+        eventlet.StopServe()
+        
+        
+
     def location_from_cam(self, location):
             
             self.cur_location = location
             self.status= "BUSY"
             print(self.cur_location)
-            self.sio.emit("receiver_goto_des", self.cur_location)
+            self.sio.emit("receiver_goto_dest", self.cur_location)
             
     def start_server(self, host, port):
-        eventlet.wsgi.server(eventlet.listen((host, port)), self.app)
+       eventlet.wsgi.server(eventlet.listen((host, port)), self.app)
+        
+        
+        
+        
 
 
 
 if __name__ == '__main__':
-    custom_server = CustomSocketIOServer()
-    custom_server.start_server(config.SERVER_SOCKET_IPV4, 5000)
+    custom_server = CustomSocketIOServer(config.SERVER_SOCKET_IPV4, 5000)
+
+    
+    

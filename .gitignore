@@ -8,3 +8,4 @@
 /.vscode/*
 /pyvenv.cfg
 /config.py
+/ipcamera.py
