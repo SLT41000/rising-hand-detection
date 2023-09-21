@@ -1,8 +1,8 @@
 import cv2
-
+import config
 USER = "admin"
 PASS = "888888"
-IP = "192.168.1.116"
+IP =  config.CAM_IPV4
 PORT = "10554"
 STREAM_PATH = "av0_0"
 

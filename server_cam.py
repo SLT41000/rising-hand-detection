@@ -67,7 +67,7 @@ class CustomSocketIOServer:
                         
     def stop_server(self):
         self.server.join(timeout=1)
-        print(1)
+        
     
     
     
@@ -83,8 +83,6 @@ class CustomSocketIOServer:
 
 if __name__ == '__main__':
     custom_server = CustomSocketIOServer(config.SERVER_SOCKET_IPV4, 5000)
-
-    custom_server.stop_server()
     
     
     

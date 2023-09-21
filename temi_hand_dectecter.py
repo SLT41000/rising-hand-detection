@@ -9,7 +9,7 @@ import math
 class temi_hand_dectecter:
     
     
-    def __init__(self,  cam=0, hand_raise_threshold=0,ip="",port="",connection=True):
+    def __init__(self,  cam=0, hand_raise_threshold=0,ip="",port="",connection=True,range=40):
         self.hand_raise_threshold= hand_raise_threshold
         self.model_pose = YOLO('yolov8n-pose.pt')  # for detect pose
         self.cap = cv2.VideoCapture(cam)
@@ -24,7 +24,7 @@ class temi_hand_dectecter:
         self.window_name="hand detector"
         self.hand_raised_flags = []  # List to track if a hand is raised for each person
         self.hand_raised_start_times = []  # List to record timestamps when hands are raised
-        self.max_in_range_table=40
+        self.max_in_range_table=range
 
     def on_mouse_click(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
@@ -40,11 +40,11 @@ class temi_hand_dectecter:
                 square_size = max(abs(self.end_x - self.start_x), abs(self.end_y - self.start_y))
                 square_name = str(len(self.dot_locations) + 1)
                 if(self.end_y<self.start_x):
-                    up =[self.end_x,self.end_y]
-                    down = [self.start_x,self.start_y]
+                    up =np.array([self.end_x,self.end_y])
+                    down = np.array([self.start_x,self.start_y])
                 else:
-                    up =[self.start_x,self.start_y]
-                    down = [self.end_x,self.end_y]
+                    up =np.array([self.start_x,self.start_y])
+                    down = np.array([self.end_x,self.end_y])
                 self.dot_locations.append((up, down, square_size, square_name))
                 self.drawing = False
     
@@ -99,10 +99,12 @@ class temi_hand_dectecter:
         nearest_dot = None
         current_time = time.time()
         for left_upper, right_lower, square_size, dot_name in self.dot_locations:
-            left, upper = left_upper
-            right, lower = right_lower
+            tmp_upper=left_upper-self.max_in_range_table
+            tmp_lower=right_lower+self.max_in_range_table
+            left, upper = tmp_upper
+            right, lower = tmp_lower
             # Check if hand_location is within the rectangle
-            if left-self.max_in_range_table <= hand_location[0] <= right+self.max_in_range_table and upper-self.max_in_range_table <= hand_location[1] <= lower-self.max_in_range_table:
+            if left <= hand_location[0] <= right and upper <= hand_location[1] <= lower:
                 nearest_dot = dot_name
                 if nearest_dot is not None and nearest_dot not in self.table_queue and (nearest_dot != self.pre_locations or current_time - self.last_append>= 5):
                     self.table_queue.append(nearest_dot)
