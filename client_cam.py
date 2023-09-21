@@ -21,9 +21,12 @@ class client_cam:
         @self.sio.on('response')
         def on_response(data):
             print('Server response:', data)
-            
+        
+        @self.sio.on('receiver_goto_dest')
+        def on_response(data):
+            print('Server response:', data)
 
-        @self.sio.on('complete')
+        @self.sio.on('on_complete')
         def on_complete():
             self.status="IDLE"
             print('Temi ready')

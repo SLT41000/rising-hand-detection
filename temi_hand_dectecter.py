@@ -4,8 +4,8 @@ import numpy as np
 import config
 from server_cam import CustomSocketIOServer
 import time
-
-
+from client_cam import client_cam
+import math
 class temi_hand_dectecter:
     
     
@@ -13,17 +13,18 @@ class temi_hand_dectecter:
         self.hand_raise_threshold= hand_raise_threshold
         self.model_pose = YOLO('yolov8n-pose.pt')  # for detect pose
         self.cap = cv2.VideoCapture(cam)
-        self.table_centers = []
         self.table_queue=[]
-        self.connection=CustomSocketIOServer(ip=ip,port=port)
+        self.connection=client_cam(ip=ip,port=str(port),connection=connection)
         self.dot_locations = []  
-        self.pre_locations=[]
         self.drawing = False
         self.start_x, self.start_y = -1, -1
         self.end_x, self.end_y = -1, -1
         self.pre_locations=None
         self.last_append=0
-        
+        self.window_name="hand detector"
+        self.hand_raised_flags = []  # List to track if a hand is raised for each person
+        self.hand_raised_start_times = []  # List to record timestamps when hands are raised
+        self.max_in_range_table=40
 
     def on_mouse_click(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
@@ -38,11 +39,22 @@ class temi_hand_dectecter:
                 self.end_x, self.end_y = x, y
                 square_size = max(abs(self.end_x - self.start_x), abs(self.end_y - self.start_y))
                 square_name = str(len(self.dot_locations) + 1)
-                center_x = (self.start_x + self.end_x) // 2
-                center_y = (self.start_y + self.end_y) // 2
-                self.dot_locations.append((center_x, center_y, square_size, square_name))
+                if(self.end_y<self.start_x):
+                    up =[self.end_x,self.end_y]
+                    down = [self.start_x,self.start_y]
+                else:
+                    up =[self.start_x,self.start_y]
+                    down = [self.end_x,self.end_y]
+                self.dot_locations.append((up, down, square_size, square_name))
                 self.drawing = False
     
+    def calculate_person_size(self, box):
+    # Calculate the width and height of the bounding box
+        xmin, ymin, xmax, ymax = box
+        width = xmax - xmin
+        height = ymax - ymin
+        size_in_pixels = width * height
+        return size_in_pixels
     
     def label_person(self,result_pose,annotated_frame):
         #การใช้ pose_est ในการการคำนวนจาก keypoint มีข้อเสียที่คิดไว้คือ มันต้องใช้มุมที่เห็นคนตรงสรีระเท่านั้นเพื่อไม้ให้ค่า keypoint ที่คำนวนผิดพลาด
@@ -51,32 +63,22 @@ class temi_hand_dectecter:
             return
         conf=result_pose[0].keypoints.conf.cpu().numpy()
         result_keypoints = result_pose[0].keypoints.xyn.cpu().numpy()
-        print(conf[0][9:11])
-        current_time = time.time()
-        for i, box in enumerate(result_pose[0].boxes.xyxy): #check pose person who raising hand
-            if np.any(conf[i][9:11]<0.25) or np.any(conf[i][5:7]<0.25):
+        for i, box in enumerate(result_pose[0].boxes.xyxy): #check pose person 
+            if np.any(conf[i][5:11]<0.25):
                 continue
-            # Extract keypoint coordinates for wrists
             left_wrist = result_keypoints[i][9][:2]
             right_wrist = result_keypoints[i][10][:2]
-            # Define a threshold for hand raising
             left_shoulder = result_keypoints[i][5][:2]
             right_shoulder = result_keypoints[i][6][:2]
-
-            # Calculate the Y-coordinates of wrists and shoulders
-            left_wrist_y = left_wrist[1]
-            right_wrist_y = right_wrist[1]
-            left_shoulder_y = left_shoulder[1]
-            right_shoulder_y = right_shoulder[1]
-            
-            
-            # Define a threshold for hand raise in relation to the shoulder
-            self.hand_shoulder_threshold = 0 # You can adjust this threshold as needed
-            
-            # Check if both wrists are above their respective shoulders
-            if (left_wrist_y+self.hand_shoulder_threshold < left_shoulder_y or right_wrist_y+self.hand_shoulder_threshold < right_shoulder_y) and  (left_shoulder_y <= 0.9 or right_shoulder_y  <=0.9):
-                # Draw bounding box and annotate the frame with the hand raise message
-                
+            left_elbow = result_keypoints[i][7][:2]
+            right_elbow = result_keypoints[i][8][:2]
+            try:
+                l_degree=self.find_degree(left_shoulder[0],left_elbow[0],left_wrist[0],left_shoulder[1],left_elbow[1],left_wrist[1])
+                r_degree=self.find_degree(right_shoulder[0],right_elbow[0],right_wrist[0],right_shoulder[1],right_elbow[1],right_wrist[1])
+            except:
+                continue
+            self.degree_thhold=20
+            if ((left_wrist[1] < left_shoulder[1])and l_degree<self.degree_thhold) or ((right_wrist[1] < right_shoulder[1] )and r_degree<self.degree_thhold) :
                 xmin, ymin, xmax, ymax = box
                 person_center = ((xmin + xmax) / 2, (ymin + ymax) / 2)
                 cv2.rectangle(annotated_frame, (int(xmin), int(ymin)), (int(xmax), int(ymax)), (0, 255, 0), 2)
@@ -91,71 +93,100 @@ class temi_hand_dectecter:
                     cv2.LINE_AA,
                 )
                 hand_location = np.array(person_center)
-                nearest_dot = None
-                min_distance = float('inf')
-            
-                for x, y, square_size, dot_name in self.dot_locations:
-                    
-                    dot_center_x = x
-                    dot_center_y = y
-                    distance_to_dot = np.linalg.norm(hand_location - np.array((dot_center_x, dot_center_y)))
-                    
-                    if distance_to_dot < min_distance:
-                        min_distance = distance_to_dot
-                        nearest_dot = dot_name
-                        
+                self.nearest_table(hand_location)
+
+    def nearest_table(self,hand_location):
+        nearest_dot = None
+        current_time = time.time()
+        for left_upper, right_lower, square_size, dot_name in self.dot_locations:
+            left, upper = left_upper
+            right, lower = right_lower
+            # Check if hand_location is within the rectangle
+            if left-self.max_in_range_table <= hand_location[0] <= right+self.max_in_range_table and upper-self.max_in_range_table <= hand_location[1] <= lower-self.max_in_range_table:
+                nearest_dot = dot_name
                 if nearest_dot is not None and nearest_dot not in self.table_queue and (nearest_dot != self.pre_locations or current_time - self.last_append>= 5):
                     self.table_queue.append(nearest_dot)
                     self.last_append = current_time
+            """ else:
+                # Calculate the minimum distance from the hand_location to the edges of the rectangle
+                distance_to_left = max(left - hand_location[0], 0)
+                distance_to_right = max(hand_location[0] - right, 0)
+                distance_to_upper = max(upper - hand_location[1], 0)
+                distance_to_lower = max(hand_location[1] - lower, 0)
+
+                # Find the minimum of these distances
+                min_distance = min(distance_to_left, distance_to_right, distance_to_upper, distance_to_lower) """
     
     def label_zone(self,annotated_frame):
-        for dot_x, dot_y, square_size, dot_name in self.dot_locations:
-                    cv2.rectangle(annotated_frame, (int(dot_x - square_size/2), int(dot_y - square_size/2)), (int(dot_x + square_size/2), int(dot_y + square_size/2)), (0, 255, 0), 2)
-                    cv2.putText(
-                        annotated_frame,
-                        dot_name,
-                        (int(dot_x), int(dot_y) + 15),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.5,
-                        (0, 255, 0),
-                        2,
-                        cv2.LINE_AA,
-                    )
-    
-    def start(self):
-        
-        self.cap.set(cv2.CAP_PROP_FPS, 30)
+        for up, down, square_size, dot_name in self.dot_locations:
+            cv2.rectangle(annotated_frame, (up[0], up[1]), (down[0],down[1]), (0, 255, 0), 2)
+            cv2.putText(
+                annotated_frame,
+                dot_name,
+                (int((up[0]+down[0])/2), int((up[1]+down[1])/2) ),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 255, 0),
+                2,
+                cv2.LINE_AA,
+            )
+            cv2.rectangle(annotated_frame, (up[0]-self.max_in_range_table, up[1]-self.max_in_range_table), (down[0]+self.max_in_range_table, down[1]+self.max_in_range_table), (0, 0, 255), 2)
+            cv2.putText(
+                annotated_frame,
+                dot_name,
+                (int((up[0]+down[0])/2), int((up[1]+down[1])/2) ),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 255, 0),
+                2,
+                cv2.LINE_AA,
+            )
 
+
+    def find_degree(self,xA,xB,x4,yA,yB,y4):
+        ABx = xB - xA
+        ABy = yB - yA
+        BCx = x4 - xB
+        BCy = y4 - yB
+        dot_product = ABx * BCx + ABy * BCy
+        magnitude_AB = math.sqrt(ABx**2 + ABy**2)
+        magnitude_BC = math.sqrt(BCx**2 + BCy**2)
+        cos_theta = dot_product / (magnitude_AB * magnitude_BC)
+        angle_degrees = math.degrees(math.acos(cos_theta))
+        return angle_degrees
+        
+        
+    def start(self):
+        self.cap.set(cv2.CAP_PROP_FPS, 30)
         while self.cap.isOpened():
             success, frame = self.cap.read()
-            cv2.namedWindow("YOLOv8")
-            cv2.setMouseCallback("YOLOv8", self.on_mouse_click)
+            cv2.namedWindow(self.window_name)
+            cv2.namedWindow("keypoint")
+            cv2.setMouseCallback(self.window_name, self.on_mouse_click)
             if success:
-                
                 result_pose = self.model_pose(frame)
-                annotated_frame = frame.copy()  # Create a copy of the frame for annotation
-                
+                annotated_frame = frame.copy()
                 self.label_person(result_pose,annotated_frame)
-
                 self.label_zone(annotated_frame)
-                print(self.table_queue)  
+                print(f"Table Queue = {self.table_queue}")  
                 print(self.connection.status)     
-                print(self.dot_locations)
+                print(f"Table Location = {self.dot_locations}")
                 if(self.connection.status=='IDLE' and len(self.table_queue)!=0):
                     self.pre_locations=self.table_queue.pop(0)
-                    self.connection.location_from_cam(self.pre_locations)
-                    
-                cv2.imshow("YOLOv8", annotated_frame)
-                
+                    print(self.pre_locations)
+                    self.connection.sentlocation(self.pre_locations)
+                cv2.imshow(self.window_name, annotated_frame)
+                cv2.imshow("keypoint",result_pose[0].plot())
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     self.cap.release()
                     cv2.destroyAllWindows()
-                    self.connection.stop_server()
+                    self.connection.disconnect()
                     break
             else:
                 break
 
-
+            
+     
 if __name__ == '__main__':
     test = temi_hand_dectecter(ip=config.SERVER_SOCKET_IPV4,port=config.SERVER_SOCKET_PORT,cam=0)
     test.start()
