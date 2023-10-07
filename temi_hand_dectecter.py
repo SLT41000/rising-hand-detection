@@ -6,13 +6,15 @@ from server_cam import CustomSocketIOServer
 import time
 from client_cam import client_cam
 import math
+
 class temi_hand_dectecter:
-    
-    
+
     def __init__(self,  cam=0, hand_raise_threshold=0,ip="",port="",connection=True,range=40):
         self.hand_raise_threshold= hand_raise_threshold
         self.model_pose = YOLO('yolov8n-pose.pt')  # for detect pose
         self.cap = cv2.VideoCapture(cam)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         self.table_queue=[]
         self.connection=client_cam(ip=ip,port=str(port),connection=connection)
         self.dot_locations = []  
@@ -25,7 +27,7 @@ class temi_hand_dectecter:
         self.hand_raised_flags = []  # List to track if a hand is raised for each person
         self.hand_raised_start_times = []  # List to record timestamps when hands are raised
         self.max_in_range_table=range
-
+        
     def on_mouse_click(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
             self.drawing = True
@@ -39,13 +41,19 @@ class temi_hand_dectecter:
                 self.end_x, self.end_y = x, y
                 square_size = max(abs(self.end_x - self.start_x), abs(self.end_y - self.start_y))
                 square_name = str(len(self.dot_locations) + 1)
-                if(self.end_y<self.start_x):
-                    up =np.array([self.end_x,self.end_y])
-                    down = np.array([self.start_x,self.start_y])
-                else:
-                    up =np.array([self.start_x,self.start_y])
-                    down = np.array([self.end_x,self.end_y])
-                self.dot_locations.append((up, down, square_size, square_name))
+                if(self.end_x<self.start_x and self.start_y > self.end_y):
+                    up_left =np.array([self.end_x,self.end_y])
+                    down_right = np.array([self.start_x,self.start_y])
+                elif(self.end_x<self.start_x and self.start_y <self.end_y):
+                    up_left = np.array([self.end_x, self.start_y])
+                    down_right = np.array([self.start_x, self.end_y])
+                elif(self.start_y>self.end_y and self.end_x>self.start_x):
+                    up_left =np.array([self.start_x,self.end_y])
+                    down_right = np.array([self.end_x,self.start_y])
+                else:#up_left on a left top rectangle down_right is on the right down
+                    up_left =np.array([self.start_x,self.start_y])
+                    down_right = np.array([self.end_x,self.end_y])
+                self.dot_locations.append((up_left, down_right, square_size, square_name))
                 self.drawing = False
     
     def calculate_person_size(self, box):
@@ -106,7 +114,7 @@ class temi_hand_dectecter:
             # Check if hand_location is within the rectangle
             if left <= hand_location[0] <= right and upper <= hand_location[1] <= lower:
                 nearest_dot = dot_name
-                if nearest_dot is not None and nearest_dot not in self.table_queue and (nearest_dot != self.pre_locations or current_time - self.last_append>= 5):
+                if nearest_dot is not None and nearest_dot not in self.table_queue and (nearest_dot != self.pre_locations or current_time - self.last_append>= 10):
                     self.table_queue.append(nearest_dot)
                     self.last_append = current_time
             """ else:
@@ -159,7 +167,7 @@ class temi_hand_dectecter:
         
         
     def start(self):
-        self.cap.set(cv2.CAP_PROP_FPS, 30)
+        
         while self.cap.isOpened():
             success, frame = self.cap.read()
             cv2.namedWindow(self.window_name)
@@ -175,7 +183,6 @@ class temi_hand_dectecter:
                 print(f"Table Location = {self.dot_locations}")
                 if(self.connection.status=='IDLE' and len(self.table_queue)!=0):
                     self.pre_locations=self.table_queue.pop(0)
-                    print(self.pre_locations)
                     self.connection.sentlocation(self.pre_locations)
                 cv2.imshow(self.window_name, annotated_frame)
                 cv2.imshow("keypoint",result_pose[0].plot())
@@ -190,5 +197,5 @@ class temi_hand_dectecter:
             
      
 if __name__ == '__main__':
-    test = temi_hand_dectecter(ip=config.SERVER_SOCKET_IPV4,port=config.SERVER_SOCKET_PORT,cam=0)
+    test = temi_hand_dectecter(ip=config.SERVER_SOCKET_IPV4,port=config.SERVER_SOCKET_PORT,cam=0,connection=False)
     test.start()

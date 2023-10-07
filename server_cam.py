@@ -3,8 +3,7 @@ import socketio
 import threading
 import config
 from eventlet import wsgi
-import sys
-import time
+
 class CustomSocketIOServer:
     def __init__(self,ip,port):
         self.sio = socketio.Server()
