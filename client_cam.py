@@ -61,14 +61,6 @@ class client_cam:
             
 
             
-            
-            
-    def change_status(self):
-        
-        if(self.status=="BUSY"):
-            self.status="IDLE"
-        else:
-            self.status="BUSY"
         
 
 if __name__ == '__main__':

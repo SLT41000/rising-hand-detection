@@ -12,15 +12,9 @@ class CustomSocketIOServer:
         })
         self.location = None
         self.cur_location=None
-        self.status = "IDLE"
         self.setup_events()
         self.server=threading.Thread(target=self.start_server, args=(ip, port))
         self.server.start()
-       
-        
-        
-        
-        
 
     def setup_events(self):
         @self.sio.event
@@ -34,7 +28,6 @@ class CustomSocketIOServer:
             print(data)
             if data == "complete":
                 self.cur_location=None
-                self.status="IDLE"
                 self.sio.emit("sender_location")
                 self.sio.emit("on_complete")
             
@@ -60,7 +53,7 @@ class CustomSocketIOServer:
         
         @self.sio.event
         def location_from_cam(sid, location):
-            print(location)
+            print(f"send location {location}")
             self.cur_location = location
             self.sio.emit("receiver_goto_dest", location)
                         

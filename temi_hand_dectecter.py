@@ -9,12 +9,9 @@ import math
 
 class temi_hand_dectecter:
 
-    def __init__(self,  cam=0, hand_raise_threshold=0,ip="",port="",connection=True,range=40):
-        self.hand_raise_threshold= hand_raise_threshold
+    def __init__(self,  cam=0, ip:str="",port:str="",connection:bool=True,range:int=40)->None:
         self.model_pose = YOLO('yolov8n-pose.pt')  # for detect pose
         self.cap = cv2.VideoCapture(cam)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         self.table_queue=[]
         self.connection=client_cam(ip=ip,port=str(port),connection=connection)
         self.dot_locations = []  
