@@ -21,8 +21,6 @@ class temi_hand_dectecter:
         self.pre_locations=None
         self.last_append=0
         self.window_name="hand detector"
-        self.hand_raised_flags = []  # List to track if a hand is raised for each person
-        self.hand_raised_start_times = []  # List to record timestamps when hands are raised
         self.max_in_range_table=range
         
     def on_mouse_click(self, event, x, y, flags, param):
