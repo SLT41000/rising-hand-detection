@@ -2,7 +2,6 @@ import socketio
 import config
 class client_cam:
     def __init__(self,connection=True,ip=None,port=5000) -> None:
-        self.status = "IDLE"
         self.connection= connection
         self.sio = socketio.Client()
         self.app = socketio.WSGIApp(self.sio, static_files={
@@ -21,21 +20,15 @@ class client_cam:
         @self.sio.on('response')
         def on_response(data):
             print('Server response:', data)
-        
-        @self.sio.on('receiver_goto_dest')
-        def on_response(data):
-            print('Server response:', data)
-
-        @self.sio.on('on_complete')
-        def on_complete():
-            self.status="IDLE"
-            print('Temi ready')
-                
-
 
         @self.sio.on('disconnect')
         def on_disconnect():
             print('Disconnected from server')
+        
+        @self.sio.on("rec_queue")
+        def queue_data(data):
+            print(data)
+            
             
 
     def connect(self,ip,port):
@@ -52,10 +45,11 @@ class client_cam:
     def sentlocation(self,location):
         if(self.connection==False):
             return "connection set false"
+        self.sio.emit('push_queue',location)
+    
+    def get_queue_data(self):
+        self.sio.emit('get_data_queue')
         
-        if(location != None):
-            self.status="BUSY"
-            self.sio.emit('location_from_cam',location)
         
         
             

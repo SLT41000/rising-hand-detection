@@ -21,8 +21,6 @@ class temi_hand_dectecter:
         self.pre_locations=None
         self.last_append=0
         self.window_name="hand detector"
-        self.hand_raised_flags = []  # List to track if a hand is raised for each person
-        self.hand_raised_start_times = []  # List to record timestamps when hands are raised
         self.max_in_range_table=range
         
     def on_mouse_click(self, event, x, y, flags, param):
@@ -111,8 +109,9 @@ class temi_hand_dectecter:
             # Check if hand_location is within the rectangle
             if left <= hand_location[0] <= right and upper <= hand_location[1] <= lower:
                 nearest_dot = dot_name
-                if nearest_dot is not None and nearest_dot not in self.table_queue and (nearest_dot != self.pre_locations or current_time - self.last_append>= 10):
-                    self.table_queue.append(nearest_dot)
+                if nearest_dot is not None  and (nearest_dot != self.pre_locations or current_time - self.last_append>= 10):
+                    self.connection.sentlocation(nearest_dot)
+                    self.pre_locations=nearest_dot
                     self.last_append = current_time
             """ else:
                 # Calculate the minimum distance from the hand_location to the edges of the rectangle
@@ -175,12 +174,8 @@ class temi_hand_dectecter:
                 annotated_frame = frame.copy()
                 self.label_person(result_pose,annotated_frame)
                 self.label_zone(annotated_frame)
-                print(f"Table Queue = {self.table_queue}")  
-                print(self.connection.status)     
+                self.connection.get_queue_data()
                 print(f"Table Location = {self.dot_locations}")
-                if(self.connection.status=='IDLE' and len(self.table_queue)!=0):
-                    self.pre_locations=self.table_queue.pop(0)
-                    self.connection.sentlocation(self.pre_locations)
                 cv2.imshow(self.window_name, annotated_frame)
                 cv2.imshow("keypoint",result_pose[0].plot())
                 if cv2.waitKey(1) & 0xFF == ord("q"):
@@ -194,5 +189,5 @@ class temi_hand_dectecter:
             
      
 if __name__ == '__main__':
-    test = temi_hand_dectecter(ip=config.SERVER_SOCKET_IPV4,port=config.SERVER_SOCKET_PORT,cam=0,connection=False)
+    test = temi_hand_dectecter(ip=config.SERVER_SOCKET_IPV4,port=config.SERVER_SOCKET_PORT,cam=0)
     test.start()
