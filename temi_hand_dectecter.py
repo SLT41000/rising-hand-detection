@@ -24,6 +24,8 @@ class temi_hand_dectecter:
         self.max_in_range_table=range
         
     def on_mouse_click(self, event, x, y, flags, param):
+        if event == cv2.EVENT_RBUTTONDOWN:
+            self.right_c_event(np.array([x,y]))
         if event == cv2.EVENT_LBUTTONDOWN:
             self.drawing = True
             self.start_x, self.start_y = x, y
@@ -97,7 +99,33 @@ class temi_hand_dectecter:
                 )
                 hand_location = np.array(person_center)
                 self.nearest_table(hand_location)
+                
+    def right_c_event(self,xy):
+        nearest_index = None
+        min_distance = float('inf')
+        for index, (left_upper, right_lower, square_size, dot_name) in  enumerate(self.dot_locations):
+            tmp_upper = left_upper - self.max_in_range_table
+            tmp_lower = right_lower + self.max_in_range_table
+            left, upper = tmp_upper
+            right, lower = tmp_lower
 
+            # Calculate the center of the current dot's location
+            dot_center = np.array([(left + right) / 2, (upper + lower) / 2])
+
+            # Calculate the distance between the hand location and the center of the dot
+            distance = np.linalg.norm(xy - dot_center)
+
+            # Check if the distance is within the allowable range
+            if distance <= self.max_in_range_table:
+                # Check if the current dot is closer than the previously found nearest dot
+                if distance < min_distance:
+                    min_distance = distance
+                    nearest_index = index
+
+        # Check if a nearest dot is found and append the data
+        if nearest_index is not None:
+            self.dot_locations.pop(nearest_index)
+    
     def nearest_table(self, hand_location: np):
         nearest_dot = None
         current_time = time.time()
