@@ -2,7 +2,7 @@ import socketio
 import config
 class client_cam:
     def __init__(self,connection=True,ip=None,port=5000) -> None:
-        self.status = "IDLE"
+        self.status = "BUSY"
         self.connection= connection
         self.sio = socketio.Client()
         self.app = socketio.WSGIApp(self.sio, static_files={
@@ -26,7 +26,7 @@ class client_cam:
         def on_response(data):
             print('Server response:', data)
 
-        @self.sio.on('on_complete')
+        @self.sio.on('on_ready')
         def on_complete():
             self.status="IDLE"
             print('Temi ready')

@@ -12,6 +12,7 @@ class CustomSocketIOServer:
         })
         self.location = None
         self.cur_location=None
+        self.cout=0
         self.setup_events()
         self.server=threading.Thread(target=self.start_server, args=(ip, port))
         self.server.start()
@@ -27,21 +28,31 @@ class CustomSocketIOServer:
         def receiver_moving_status(sid, data):
             print(data)
             if data == "complete":
-                self.cur_location=None
                 self.sio.emit("sender_location")
-                self.sio.emit("on_complete")
-            
+        
+        @self.sio.event
+        def on_ready(sid, data):
+            print(data)
+            if data == "ready":
+                self.cur_location=None
+                self.sio.emit("on_ready")
             
         
         @self.sio.event
         def connect(sid, environ):
+            self.cout+=1
+            if(self.cout==2):
+                self.sio.emit("on_ready")
+            elif(self.cout>2):
+                self.cout=1
             print('connect ', sid)
-            self.sio.emit("response","hello")
             
 
         @self.sio.event
         def response(sid, data):
-            print('message ', data)
+            if(data=="on_ready"):
+                self.sio.emit("on_ready")
+                
 
         @self.sio.event
         def disconnect(sid):

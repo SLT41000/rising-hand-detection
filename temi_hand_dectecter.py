@@ -98,29 +98,34 @@ class temi_hand_dectecter:
                 hand_location = np.array(person_center)
                 self.nearest_table(hand_location)
 
-    def nearest_table(self,hand_location):
+    def nearest_table(self, hand_location: np):
         nearest_dot = None
         current_time = time.time()
+        min_distance = float('inf')  # Initialize minimum distance to a very large value
+
         for left_upper, right_lower, square_size, dot_name in self.dot_locations:
-            tmp_upper=left_upper-self.max_in_range_table
-            tmp_lower=right_lower+self.max_in_range_table
+            tmp_upper = left_upper - self.max_in_range_table
+            tmp_lower = right_lower + self.max_in_range_table
             left, upper = tmp_upper
             right, lower = tmp_lower
-            # Check if hand_location is within the rectangle
-            if left <= hand_location[0] <= right and upper <= hand_location[1] <= lower:
-                nearest_dot = dot_name
-                if nearest_dot is not None and nearest_dot not in self.table_queue and (nearest_dot != self.pre_locations or current_time - self.last_append>= 10):
-                    self.table_queue.append(nearest_dot)
-                    self.last_append = current_time
-            """ else:
-                # Calculate the minimum distance from the hand_location to the edges of the rectangle
-                distance_to_left = max(left - hand_location[0], 0)
-                distance_to_right = max(hand_location[0] - right, 0)
-                distance_to_upper = max(upper - hand_location[1], 0)
-                distance_to_lower = max(hand_location[1] - lower, 0)
 
-                # Find the minimum of these distances
-                min_distance = min(distance_to_left, distance_to_right, distance_to_upper, distance_to_lower) """
+            # Calculate the center of the current dot's location
+            dot_center = np.array([(left + right) / 2, (upper + lower) / 2])
+
+            # Calculate the distance between the hand location and the center of the dot
+            distance = np.linalg.norm(hand_location - dot_center)
+
+            # Check if the distance is within the allowable range
+            if distance <= self.max_in_range_table:
+                # Check if the current dot is closer than the previously found nearest dot
+                if distance < min_distance:
+                    min_distance = distance
+                    nearest_dot = dot_name
+
+        # Check if a nearest dot is found and append the data
+        if nearest_dot is not None and nearest_dot not in self.table_queue and (nearest_dot != self.pre_locations or current_time - self.last_append >= 10):
+            self.table_queue.append(nearest_dot)
+            self.last_append = current_time
     
     def label_zone(self,annotated_frame):
         for up, down, square_size, dot_name in self.dot_locations:
