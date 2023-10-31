@@ -52,10 +52,12 @@ class client_cam:
     def sentlocation(self,location):
         if(self.connection==False):
             return "connection set false"
-        
-        if(location != None):
+        if(location=="HOMEBASE"):
+            self.sio.emit('home_base')
+        elif(location != None):
             self.status="BUSY"
             self.sio.emit('location_from_cam',location)
+        
         
         
             

@@ -36,7 +36,11 @@ class CustomSocketIOServer:
             if data == "ready":
                 self.cur_location=None
                 self.sio.emit("on_ready")
-            
+        
+        @self.sio.event
+        def home_base(sid):
+            self.cur_location="HOMEBASE"
+            self.sio.emit("go_to_homebase")
         
         @self.sio.event
         def connect(sid, environ):
