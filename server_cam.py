@@ -17,8 +17,6 @@ class CustomSocketIOServer:
         self.location = None
         self.cur_location=None
         self.cout=0
-        self.last_append=0
-        self.last_update=0
         self.setup_events()
         self.server=threading.Thread(target=self.start_server, args=(ip, port))
         self.server.start()
@@ -49,6 +47,7 @@ class CustomSocketIOServer:
             self.cur_location = location
             self.sio.emit("receiver_goto_dest", location)
         
+        #del for del right chick on client
         @self.sio.event
         def del_table(sid,xy,input_cam_id):
             nearest_index = None
@@ -62,18 +61,21 @@ class CustomSocketIOServer:
                 self.table.pop(nearest_index)
             self.sio.emit("event_update_table")
 
+        #for insert queue
         @self.sio.event
         def append_queue(sid,table_name : str):
             if(table_name not in self.queue):
                 self.queue.append(table_name)
             self.pop_queue()
         
+        #for insert table
         @self.sio.event
         def append_table(sid,up_left, down_right, square_size,name):
             if(up_left, down_right, square_size,name!=None):
                 self.table.append((up_left, down_right, square_size,name))
             self.sio.emit("event_update_table")
-                
+        
+        #for get table list to send to client
         @self.sio.event
         def get_table(sid,input_cam_id:int)->list:
             tmp_list=[]
@@ -82,6 +84,7 @@ class CustomSocketIOServer:
                     tmp_list.append((left_upper, right_lower, square_size,str(i+1)))
             self.sio.emit("update_table",tmp_list)
         
+        #for del table on disconnect camera
         @self.sio.event
         def cam_disconnect(sid,input_cam_id:int)->list:
             tmp_list=[]
@@ -90,7 +93,7 @@ class CustomSocketIOServer:
                     tmp_list.append(self.table[i])
             self.table=tmp_list
                 
-        
+        #use for tami to update server that tami is ready
         @self.sio.event
         def on_ready(sid, data):
             print(data)
@@ -105,7 +108,7 @@ class CustomSocketIOServer:
         def connect(sid, environ):
             self.cout+=1
             if(self.cout==2):
-                self.sio.emit("on_ready")
+                self.status=="IDLE"
             elif(self.cout>2):
                 self.cout=1
             print('connect ', sid)
@@ -125,17 +128,16 @@ class CustomSocketIOServer:
         def receiver_location(sid, data):
             self.location = data
         
+        #get std data want to show on client
         @self.sio.event
         def get_data(sid):
-            current_time = time.time()
-            if(current_time-self.last_update>1):
-                txt=f"Table Queue = {self.queue}\n{self.status}\nTable Location = {self.table}"
-                self.sio.emit("update_data",txt)
-                self.last_update = current_time
+            txt=f"Table Queue = {self.queue}\n{self.status}\nTable Location = {self.table}"
+            self.sio.emit("update_data",txt)
                         
     def stop_server(self):
         self.server.join(timeout=1)
-        
+    
+    #for send queue
     def pop_queue(self):
         if(len(self.queue)!=0 and self.status=="IDLE"):
             location=self.queue.pop(0)
@@ -143,7 +145,6 @@ class CustomSocketIOServer:
             self.cur_location = location
             self.status="BUSY"
             self.sio.emit("receiver_goto_dest", location)
-    
     
 
             

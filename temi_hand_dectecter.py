@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import config
 import time
-from client_cam import client_cam
+from client_cam import ClientCam
 import math
 
 class temi_hand_dectecter:
@@ -12,7 +12,7 @@ class temi_hand_dectecter:
         self.cap = cv2.VideoCapture(cam)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-        self.connection=client_cam(ip=ip,port=str(port),connection=connection)
+        self.connection=ClientCam(ip=ip,port=str(port),connection=connection)
         self.drawing = False
         self.start_x, self.start_y = -1, -1
         self.end_x, self.end_y = -1, -1
