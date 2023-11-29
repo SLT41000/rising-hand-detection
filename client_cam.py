@@ -55,7 +55,7 @@ class ClientCam:
     def disconnect(self):
         if not self.connection:
             return "Connection is set to false"
-        self.sio.emit("cam_disconnect", self.cam_id)
+        #self.sio.emit("cam_disconnect", self.cam_id)
         self.sio.disconnect()
 
     def append_queue(self, queue_name):
@@ -72,6 +72,9 @@ class ClientCam:
 
     def get_data(self):
         self.sio.emit("get_data")
+    
+    def re_status(self):
+        self.sio.emit("on_ready","ready")
 
 
 if __name__ == '__main__':

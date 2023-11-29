@@ -11,11 +11,13 @@ class CustomSocketIOServer:
         self.app = socketio.WSGIApp(self.sio, static_files={
             '/': {'content_type': 'text/html', 'filename': 'index.html'}
         })
-        self.status = "BUSY"
+        self.status = "IDLE"
         self.queue=[]
         self.table = [] 
+        self.last_append=0
+        self.idle_time=0
         self.location = None
-        self.cur_location=None
+        self.cur_location="homebase"
         self.cout=0
         self.setup_events()
         self.server=threading.Thread(target=self.start_server, args=(ip, port))
@@ -35,18 +37,9 @@ class CustomSocketIOServer:
             if data == "complete":
                 self.sio.emit("sender_location")
 
-        @self.sio.event
-        def home_base(sid):
-            self.cur_location="HOMEBASE"
-            self.sio.emit("go_to_homebase")
+        
         
         #cam_event
-        @self.sio.event
-        def location_from_cam(sid, location):
-            print(f"send location {location}")
-            self.cur_location = location
-            self.sio.emit("receiver_goto_dest", location)
-        
         #del for del right chick on client
         @self.sio.event
         def del_table(sid,xy,input_cam_id):
@@ -64,7 +57,10 @@ class CustomSocketIOServer:
         #for insert queue
         @self.sio.event
         def append_queue(sid,table_name : str):
-            if(table_name not in self.queue):
+            current_time = time.time()
+            if(table_name not in self.queue and (self.cur_location!=table_name or current_time - self.last_append>= 10)):
+                self.last_append=current_time
+                self.cur_location=table_name
                 self.queue.append(table_name)
             self.pop_queue()
         
@@ -98,7 +94,6 @@ class CustomSocketIOServer:
         def on_ready(sid, data):
             print(data)
             if data == "ready":
-                self.cur_location=None
                 self.status="IDLE"
                 self.pop_queue()
         
@@ -106,11 +101,6 @@ class CustomSocketIOServer:
         
         @self.sio.event
         def connect(sid, environ):
-            self.cout+=1
-            if(self.cout==2):
-                self.status=="IDLE"
-            elif(self.cout>2):
-                self.cout=1
             print('connect ', sid)
             
 
@@ -136,17 +126,25 @@ class CustomSocketIOServer:
                         
     def stop_server(self):
         self.server.join(timeout=1)
+        
+        
+    def home_base(self):
+        self.cur_location="homebase"
+        print("Go Home Base")
+        #self.status="BUSY"
+        self.sio.emit("receiver_goto_dest","home base")
     
-    #for send queue
+    #for send queue to temi
     def pop_queue(self):
         if(len(self.queue)!=0 and self.status=="IDLE"):
             location=self.queue.pop(0)
+            self.cur_location=location
             print(f"send location {location}")
-            self.cur_location = location
             self.status="BUSY"
             self.sio.emit("receiver_goto_dest", location)
-    
-
+        elif(len(self.queue)==0 and self.status=="IDLE" and self.cur_location!="homebase"):
+            self.home_base()
+            
             
     def start_server(self, host, port):
         eventlet.wsgi.server(eventlet.listen((host, port)), self.app)
@@ -157,7 +155,7 @@ class CustomSocketIOServer:
 
 
 if __name__ == '__main__':
-    custom_server = CustomSocketIOServer(config.SERVER_SOCKET_IPV4, 5000)
+    custom_server = CustomSocketIOServer(config.SERVER_SOCKET_IPV4, 5000) 
     
     
     
